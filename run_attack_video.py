@@ -64,7 +64,7 @@ current_out_dir = out_directory + '\\' + str(calendar.timegm(time.gmtime()))
 os.mkdir(current_out_dir)
 
 run_dictionary = True #Run dictionary attack
-run_rt_generation = True #Run realtime generation of noise
+run_rt_generation = False #Run realtime generation of noise
 
 if run_dictionary:
     os.mkdir(current_out_dir + '\\dict')
