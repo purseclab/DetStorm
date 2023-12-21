@@ -142,12 +142,20 @@ attempts_per_frame = 2 # How many noise patterns should we generate for each fra
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
+skip_until = "b1d0091f-f2c2d2ae" #Last video we had generated
 if digital_mode:
     print("DIGITAL MODE ACTIVE")
     print("Out folder: " + current_out_dir.split("\\")[-1])
     vid_idx = 0
     for vidpath in glob.iglob(video_directory + '\\*'):
         print("VIDEO " + str(vid_idx) + ": " + vidpath.split("\\")[-1].split(".")[0])
+        if skip_until is not None:
+            print("Skipping video")
+            if skip_until == vidpath.split("\\")[-1].split(".")[0]:
+                print("Skip complete")
+                skip_until = None
+            vid_idx += 1
+            continue
         az_util_arr = []
         max_perturb = -1
         cap = cv2.VideoCapture(vidpath)
