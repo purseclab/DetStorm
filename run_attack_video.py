@@ -25,6 +25,8 @@ for line in fileinput.input(FILE_PATH, inplace=True):
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 ##################################################################
 
+#TODO: Drop yolo confidence, and run large-scale generation
+
 import glob
 import pixellib
 from pixellib.semantic import semantic_segmentation
@@ -38,6 +40,8 @@ import calendar
 import time
 import random
 from PIL import Image
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
 sys.path.append('C:\\Users\\Scott Moran\\Documents\\Research\\NMSProject-master\\CustomizedPhantomSponges')
 
@@ -48,7 +52,7 @@ segment_image = semantic_segmentation()
 segment_image.load_ade20k_model("deeplabv3_xception65_ade20k.h5")
 
 #DIGITAL vs REAL WORLD switch
-digital_mode = True
+digital_mode = False
 
 #get patch directory
 patch_directory = 'D:\\Research\\phantom_sponge_out'
@@ -65,6 +69,7 @@ os.mkdir(current_out_dir)
 
 run_dictionary = True #Run dictionary attack
 run_rt_generation = False #Run realtime generation of noise
+use_god_patch = True #For realtime generation, use the "god patch" instead of generating one from scratch
 
 if run_dictionary:
     os.mkdir(current_out_dir + '\\dict')
@@ -86,7 +91,7 @@ def pick_highest_iter(patch_paths):
     return highest_img
 
 def image_to_noise(img, target_size, return_mask_use=None, az_util_use=None):
-    noise_mult = 2 # How much stronger the noise should be
+    noise_mult = 1 # How much stronger the noise should be
     if return_mask_use is None or az_util_use is None:
         return_masks, return_ims, az_util = segment.segmentation_mask_im(segment_image, img)
     else:
@@ -142,7 +147,7 @@ attempts_per_frame = 2 # How many noise patterns should we generate for each fra
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
-skip_until = "b1d0091f-f2c2d2ae" #Last video we had generated
+skip_until = "b1d7b3ac-36f2d3b7" #Last video we had generated
 if digital_mode:
     print("DIGITAL MODE ACTIVE")
     print("Out folder: " + current_out_dir.split("\\")[-1])
@@ -205,27 +210,30 @@ if digital_mode:
                 segment_result = None
                 for i in range(0, attempts_per_frame):
                     if first_patch is None:
-                        victim_imgs = []
-                        #Save frame to be loaded
-                        if not cv2.imwrite(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg'), frame):
-                            print("COULD NOT WRITE ADDED")
-                            print(current_out_dir)
-
-                        victim_imgs.append(np.reshape(np.asarray(Image.open(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg')).resize((640, 640))), (3, 640, 640)))
-#                        victim_imgs.append(np.reshape(np.asarray(cv2.resize(frame, (640, 640))), (3, 640, 640)))
-                        if not(len(victim_imgs) < 1 or victim_imgs[0] is None):
-                            run_attack(60, 0.005, victim_imgs, current_out_dir + "\\rw\\PATCH")
+                        if use_god_patch:
+                            patch_choice = 'god_patch.png'
                         else:
-                            #big oof
-                            continue
-                            
-                        victim_imgs.clear()
-                        os.remove(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg'))
+                            victim_imgs = []
+                            #Save frame to be loaded
+                            if not cv2.imwrite(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg'), frame):
+                                print("COULD NOT WRITE ADDED")
+                                print(current_out_dir)
 
-                        #Obtain the patch
-                        patch_choice = pick_highest_iter(glob.glob(current_out_dir + "\\rw\\PATCH\\save_patch\\*"))
-                        print("PATCH CHOICE:")
-                        print(patch_choice)
+                            victim_imgs.append(np.reshape(np.asarray(Image.open(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg')).resize((640, 640))), (3, 640, 640)))
+    #                        victim_imgs.append(np.reshape(np.asarray(cv2.resize(frame, (640, 640))), (3, 640, 640)))
+                            if not(len(victim_imgs) < 1 or victim_imgs[0] is None):
+                                run_attack(60, 0.005, victim_imgs, current_out_dir + "\\rw\\PATCH")
+                            else:
+                                #big oof
+                                continue
+                            
+                            victim_imgs.clear()
+                            os.remove(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg'))
+
+                            #Obtain the patch
+                            patch_choice = pick_highest_iter(glob.glob(current_out_dir + "\\rw\\PATCH\\save_patch\\*"))
+                            print("PATCH CHOICE:")
+                            print(patch_choice)
                         first_patch = np.asarray(Image.open(patch_choice))
 
                     #Process the patch
@@ -306,6 +314,135 @@ if digital_mode:
 
 
         vid_idx += 1
+
+#REALWORLD MODE
+else:
+    az_util_arr = []
+    max_perturb = -1
+    try:
+        print("RW MODE ACTIVE")
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("Error on video capture")
+            sys.exit()
+        img_idx = 0
+        img_idx_2 = 0
+
+        run_in_progress = True
+        first_patch = None
+        display_patch = None
+#        cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
+#        cv2.setWindowProperty("window",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
         
+        first_patch_set = False
+        while run_in_progress:
+            if display_patch is not None:
+                if not first_patch_set:
+                    first_patch_set = True
+                    imgplot = plt.imshow(display_patch)
+                    plt.axis('off')
+                    manager = plt.get_current_fig_manager()
+                    manager.full_screen_toggle()
+                else:
+                    imgplot.set_data(display_patch)
+                plt.pause(.1)
+                plt.draw()
+
+            ret, frame = cap.read()
+            if not ret:
+                print("Stream ended.")
+                break
+            if run_dictionary:
+                print("Dictionary  attempt")
+                temp_return_mask = None
+                for i in range(0, attempts_per_frame):
+                    if temp_return_mask is None:
+                        patch, azutil, temp_return_mask = image_to_noise(frame, frame.shape)
+                    else:
+                        patch, azutil, temp_return_mask = image_to_noise(frame, frame.shape, temp_return_mask, azutil)
+                    #Append azutil
+                    az_util_arr.append(str(azutil))
+                    #Append max noise
+                    max_noise_idx = np.unravel_index(patch.argmax(), patch.shape)
+                    if patch[max_noise_idx[0]][max_noise_idx[1]][max_noise_idx[2]] > max_perturb:
+                        max_perturb = patch[max_noise_idx[0]][max_noise_idx[1]][max_noise_idx[2]]
+
+                    #Display the patch
+                    display_patch = patch
+                del temp_return_mask
+
+            elif run_rt_generation:
+                print("Realtime attempt")
+                segment_result = None
+                for i in range(0, attempts_per_frame):
+                    if first_patch is None:
+                        if use_god_patch:
+                            patch_choice = 'god_patch.png'
+                        else:
+                            victim_imgs = []
+                            #Save frame to be loaded
+                            if not cv2.imwrite(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg'), frame):
+                                print("COULD NOT WRITE ADDED")
+                                print(current_out_dir)
+
+                            victim_imgs.append(np.reshape(np.asarray(Image.open(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg')).resize((640, 640))), (3, 640, 640)))
+    #                        victim_imgs.append(np.reshape(np.asarray(cv2.resize(frame, (640, 640))), (3, 640, 640)))
+                            if not(len(victim_imgs) < 1 or victim_imgs[0] is None):
+                                run_attack(60, 0.005, victim_imgs, current_out_dir + "\\rw\\PATCH")
+                            else:
+                                #big oof
+                                continue
+
+                            victim_imgs.clear()
+                            os.remove(os.path.join(current_out_dir + '\\rw', 'first_frame.jpg'))
+                            #Obtain the patch
+                            patch_choice = pick_highest_iter(glob.glob(current_out_dir + "\\rw\\PATCH\\save_patch\\*"))
+                            print("PATCH CHOICE:")
+                            print(patch_choice)
+                        first_patch = np.asarray(Image.open(patch_choice))
+
+                    #Process the patch
+                    if segment_result is None:
+                        segment_result = segment.segment_full_im(segment_image, frame)
+
+                    return_mask = segment_result
+                    current_patch = np.copy(first_patch)
+                    rdim = (frame.shape[1], frame.shape[0])
+                    current_patch = cv2.resize(current_patch, rdim, interpolation=cv2.INTER_CUBIC)
+                    mask3d = np.stack((return_mask,)*3, axis=-1)
+
+                    current_patch = np.multiply(current_patch, mask3d)
+
+                    display_patch = current_patch
+
+                    del current_patch
+                    del mask3d
+
+                    img_idx_2 += 1
+                    if not run_dictionary:
+                        img_idx += 1
+                del segment_result
+
+    #Process the images into a video and save the relevant data
+    except KeyboardInterrupt:
+        #Dump the other stats
+        azutil_file = open(current_out_dir + '\\azutil_' + 'rw' + '.txt', 'w')
+        azutil_file.writelines(line + '\n' for line in az_util_arr)
+        azutil_file.close()
+        az_util_arr.clear()
+
+        max_perturb_file = open(current_out_dir + '\\max_perturb_' + 'rw' + '.txt', 'w')
+        max_perturb_file.write(str(max_perturb))
+        max_perturb_file.close()
+        
+        print("Stats logged to file")
+        try:
+            sys.exit(130)
+        except SystemExit:
+            os._exit(130)
+
+        
+
+
         
             
