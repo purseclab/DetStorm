@@ -16,13 +16,13 @@ import glob
 import sys
 import math
 from PIL import Image
-sys.path.append('C:\\Users\\Scott Moran\\Documents\\Research\\NMSProject-master\\PhantomSponges')
+sys.path.append('C:\\Users\\x\\Documents\\Research\\NMSProject-master\\PhantomSponges')
 
 # 计算 benign_detection_loss 的时候，使用的 nms 算法; 使用phantom提供的 inplace-free 版本的nms
 from utils import *
 
-workdir = Path(r'C:\\Users\\Scott Moran\\Documents\\Research\\NMSProject-master\\CustomizedPhantomSponges\\workdir')
-pretrainedCheckpointDir = Path(r'C:\\Users\\Scott Moran\\Documents\\Research\\NMSProject-master\\CustomizedPhantomSponges\\pretrainedCheckpoints')
+workdir = Path(r'C:\\Users\\x\\Documents\\Research\\NMSProject-master\\CustomizedPhantomSponges\\workdir')
+pretrainedCheckpointDir = Path(r'C:\\Users\\x\\Documents\\Research\\NMSProject-master\\CustomizedPhantomSponges\\pretrainedCheckpoints')
 
 trailDir = workdir / 'tmp_trail_Batch_XX'
 trailDir.mkdir(exist_ok=True, parents=True)

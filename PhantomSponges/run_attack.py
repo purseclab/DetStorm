@@ -33,8 +33,8 @@ img_size=(640,640)
 batch_size = 8
 num_workers = 4
 max_labels_per_img = 65
-BDD_IMG_DIR = r'C:\Users\Scott Moran\Documents\Research\NMSProject-master\PhantomSponges\BDD_Dir\BDD_IMG_DIR'
-BDD_LAB_DIR = r'C:\Users\Scott Moran\Documents\Research\NMSProject-master\PhantomSponges\BDD_Dir\BDD_LAB_DIR'
+BDD_IMG_DIR = r'C:\Users\x\Documents\Research\NMSProject-master\PhantomSponges\BDD_Dir\BDD_IMG_DIR'
+BDD_LAB_DIR = r'C:\Users\x\Documents\Research\NMSProject-master\PhantomSponges\BDD_Dir\BDD_LAB_DIR'
 
 
 # Load Dataset
