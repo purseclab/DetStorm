@@ -42,6 +42,7 @@ import random
 from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import math
 
 sys.path.append('C:\\Users\\Scott Moran\\Documents\\Research\\NMSProject-master\\CustomizedPhantomSponges')
 
@@ -52,7 +53,7 @@ segment_image = semantic_segmentation()
 segment_image.load_ade20k_model("deeplabv3_xception65_ade20k.h5")
 
 #DIGITAL vs REAL WORLD switch
-digital_mode = False
+digital_mode = True
 
 #get patch directory
 patch_directory = 'D:\\Research\\phantom_sponge_out'
@@ -67,8 +68,8 @@ current_out_dir = out_directory + '\\' + str(calendar.timegm(time.gmtime()))
 #create the directory
 os.mkdir(current_out_dir)
 
-run_dictionary = True #Run dictionary attack
-run_rt_generation = False #Run realtime generation of noise
+run_dictionary = False #Run dictionary attack
+run_rt_generation = True #Run realtime generation of noise
 use_god_patch = True #For realtime generation, use the "god patch" instead of generating one from scratch
 
 if run_dictionary:
@@ -144,10 +145,13 @@ attack_runtime = 5 #Maximum time, in seconds, we want our example to be.  Used t
 
 attempts_per_frame = 2 # How many noise patterns should we generate for each frame, 
 
+generate_mask_every_n = 30 # skip mask generation for n frames
+dict_mask = None
+rw_mask = None
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
-skip_until = "b1d7b3ac-36f2d3b7" #Last video we had generated
+skip_until = None #Last video we had generated
 if digital_mode:
     print("DIGITAL MODE ACTIVE")
     print("Out folder: " + current_out_dir.split("\\")[-1])
@@ -179,11 +183,15 @@ if digital_mode:
                 break
             #create temp folder for images
             if run_dictionary:
-                print("Dictionary  attempt")
-                temp_return_mask = None
+                print(str(vid_idx) + ": Dictionary  attempt")
+                if (img_idx/attempts_per_frame) % generate_mask_every_n != 0:
+                    temp_return_mask = dict_mask
+                else:
+                    temp_return_mask = None
                 for i in range(0, attempts_per_frame):
                     if temp_return_mask is None:
                         patch, azutil, temp_return_mask = image_to_noise(frame, frame.shape)
+                        dict_mask = temp_return_mask
                     else:
                         patch, azutil, temp_return_mask = image_to_noise(frame, frame.shape, temp_return_mask, azutil)
                     #Append azutil
@@ -206,12 +214,14 @@ if digital_mode:
                 del temp_return_mask
             
             if run_rt_generation:
-                print("Realtime attempt")
+                print(str(vid_idx) + ": Realtime attempt")
                 segment_result = None
+                if (img_idx_2/attempts_per_frame) % generate_mask_every_n != 0:
+                    segment_result = rw_mask
                 for i in range(0, attempts_per_frame):
                     if first_patch is None:
                         if use_god_patch:
-                            patch_choice = 'god_patch.png'
+                            patch_choice = 'god_patch_2.png'
                         else:
                             victim_imgs = []
                             #Save frame to be loaded
@@ -239,13 +249,14 @@ if digital_mode:
                     #Process the patch
                     if segment_result is None:
                         segment_result = segment.segment_full_im(segment_image, frame)
+                        rw_mask = segment_result
    
                     return_mask = segment_result
                     current_patch = np.copy(first_patch)
                     rdim = (frame.shape[1], frame.shape[0])
                     current_patch = cv2.resize(current_patch, rdim, interpolation=cv2.INTER_CUBIC)
                     mask3d = np.stack((return_mask,)*3, axis=-1)
-
+#
                     current_patch = np.multiply(current_patch, mask3d)
 
                     added_im_2 = frame + current_patch
